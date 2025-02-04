@@ -1,4 +1,18 @@
 services:
+  app:
+    container_name: teste_guia_app
+    build: .
+    depends_on:
+      - db
+    environment:
+      - API_KEY=${API_KEY}
+      - API_URL=${API_URL}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - .:/app
+
 
   db:
     container_name: teste_guia_db

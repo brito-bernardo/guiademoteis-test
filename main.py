@@ -9,6 +9,7 @@ load_dotenv()
 
 ANALISE_PROMPT = """Dado o seguinte diálogo entre um atendente e um cliente, avalie a satisfação do cliente com o atendimento, levando em consideração a clareza, rapidez e eficácia da resposta. 
 Atribua uma nota de 0 a 10, sendo 0 para totalmente insatisfeito e 10 para totalmente satisfeito. 
+Responda apenas com o número correspondente e não inclua palavras ou frases adicionais.
 
 Aqui está o diálogo:
  
@@ -37,20 +38,21 @@ async def main():
     api_key = os.getenv("API_KEY")
     api_url = os.getenv("API_URL")
     await prisma.connect()
-
+    print("Conectando ao banco de dados")
     messages = await prisma.message.group_by(
-        by=["session_id"],
-        _count={"session_id": True},)
+        by=["session_id"])
 
     for group in messages:
         sessions_id = group["session_id"]
 
         sessions_messages = await prisma.message.find_many(
             where={"session_id": sessions_id},
-            select={"content": True},
         )
-        #Seria interessante limitar para nao passar do limite de tokens
-        concatenated_messages = "\n".join([message["content"] for message in sessions_messages])
+
+        # Pegando apenas os conteúdos
+        contents = [msg.content for msg in sessions_messages]
+        # Seria interessante limitar para nao passar do limite de tokens
+        concatenated_messages = "\n".join(contents)
 
         client = ClientOpenAI(
             api_key=api_key,
@@ -58,21 +60,21 @@ async def main():
         )
 
         #Analise de satisfação
-        satisfaction = await client.invoke(
+        satisfaction = client.invoke(
             ANALISE_PROMPT.format(
                 messages=concatenated_messages
             )
         )
 
         #Resumo da conversa
-        summary = await client.invoke(
+        summary = client.invoke(
             RESUMO_PROMPT.format(
                 messages=concatenated_messages
             )
         )
 
         #Melhoria no atendimento
-        improvement = await client.invoke(
+        improvement = client.invoke(
             MELHORIA_PROMPT.format(
                 messages=concatenated_messages
             )
@@ -92,5 +94,6 @@ async def main():
     await prisma.disconnect()
 
 if __name__ == "__main__":
+    print("Iniciando análise de mensagens...")
     asyncio.run(main())
 
